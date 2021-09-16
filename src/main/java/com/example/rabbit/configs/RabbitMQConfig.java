@@ -1,9 +1,6 @@
 package com.example.rabbit.configs;
 
-import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.BindingBuilder;
-import org.springframework.amqp.core.DirectExchange;
-import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
@@ -13,6 +10,8 @@ import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import static com.example.rabbit.constants.RabbitConstant.*;
 
 @Configuration
 public class RabbitMQConfig {
@@ -31,14 +30,9 @@ public class RabbitMQConfig {
 	private String password;
 
 
-	@Value("${javainuse.rabbitmq.queue}")
-	String queueName;
 
-	@Value("${javainuse.rabbitmq.exchange}")
-	String exchange;
 
-	@Value("${javainuse.rabbitmq.routingkey}")
-	private String routingkey;
+
 
 	@Bean
     ConnectionFactory connectionFactory() {
@@ -67,20 +61,62 @@ public class RabbitMQConfig {
 	public MessageConverter jsonMessageConverter() {
 		return new Jackson2JsonMessageConverter();
 	}
-
+/*
 	@Bean
     Queue queue() {
-		return new Queue(queueName, false);
+		return new Queue(PRIMARY_QUEUE, false);
 	}
 
 	@Bean
-    DirectExchange exchange() {
-		return new DirectExchange(exchange);
+    DirectExchange EXCHANGE_NAME() {
+		return new DirectExchange(EXCHANGE_NAME);
 	}
 
 	@Bean
-    Binding binding(Queue queue, DirectExchange exchange) {
-		return BindingBuilder.bind(queue).to(exchange).with(routingkey);
+    Binding binding(Queue queue, DirectExchange EXCHANGE_NAME) {
+		return BindingBuilder.bind(queue).to(EXCHANGE_NAME).with(PRIMARY_ROUTING_KEY);
+	}*/
+
+	@Bean
+	DirectExchange exchange() {
+		return new DirectExchange(EXCHANGE_NAME);
+	}
+
+	@Bean
+	Queue primaryQueue() {
+		return QueueBuilder.durable(PRIMARY_QUEUE)
+				.deadLetterExchange(EXCHANGE_NAME)
+				.deadLetterRoutingKey(PRIMARY_QUEUE + ".wait")
+				.ttl(10000)
+				.build();
+	}
+
+	@Bean
+	Queue waitQueue() {
+		return QueueBuilder.durable(PRIMARY_QUEUE + ".wait")
+				.deadLetterExchange(EXCHANGE_NAME)
+				.deadLetterRoutingKey(PRIMARY_ROUTING_KEY)
+				.build();
+	}
+
+	@Bean
+	Queue parkinglotQueue() {
+		return new Queue(PRIMARY_QUEUE + ".parkingLot");
+	}
+
+	@Bean
+	Binding primaryBinding(Queue primaryQueue, DirectExchange exchange) {
+		return BindingBuilder.bind(primaryQueue).to(exchange).with(PRIMARY_ROUTING_KEY);
+	}
+
+	@Bean
+	Binding waitBinding(Queue waitQueue, DirectExchange exchange){
+		return BindingBuilder.bind(waitQueue).to(exchange).with(PRIMARY_QUEUE + ".wait");
+	}
+
+	@Bean
+	Binding parkingBinding(Queue parkinglotQueue, DirectExchange exchange) {
+		return BindingBuilder.bind(parkinglotQueue).to(exchange).with(PRIMARY_QUEUE + ".parkingLot");
 	}
 
 
